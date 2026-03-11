@@ -66,6 +66,9 @@ impl TunnelManager {
 
 impl TunnelManagerInner {
     pub async fn start_tunnel(&mut self, config: &TunnelConfig) -> Result<(), String> {
+        // Pre-flight check: verify the local port is available
+        check_port_available(config.local_port).await?;
+
         let ephemeral_port = ssh::allocate_ephemeral_port()?;
 
         let (log_tx, log_rx) = mpsc::unbounded_channel();
@@ -214,6 +217,36 @@ impl TunnelManagerInner {
             .get(id)
             .map(|t| t.stats.snapshot())
             .ok_or_else(|| format!("Tunnel {} not running", id))
+    }
+}
+
+/// Check if a port is available for binding.
+/// Returns an error if the port is already in use or cannot be bound.
+async fn check_port_available(port: u16) -> Result<(), String> {
+    use tokio::net::TcpListener;
+
+    match TcpListener::bind(format!("127.0.0.1:{}", port)).await {
+        Ok(_listener) => {
+            // Port is available - the listener is dropped immediately
+            Ok(())
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                Err(format!(
+                    "Port {} is already in use by another application",
+                    port
+                ))
+            } else if e.kind() == std::io::ErrorKind::PermissionDenied
+                || e.raw_os_error() == Some(13)
+                || e.raw_os_error() == Some(1)
+            {
+                // For privileged ports, this is expected and we'll handle it later
+                // via the osascript sudo flow
+                Ok(())
+            } else {
+                Err(format!("Cannot bind port {}: {}", port, e))
+            }
+        }
     }
 }
 
