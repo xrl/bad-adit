@@ -310,7 +310,7 @@ Ordered checklist. Each item is a concrete deliverable. Later items depend on ea
   - `test` job: Ubuntu, sshd + socat setup, `cargo test --lib`, `cargo test --test integration`
   - `lint` job: `cargo fmt --check`, `cargo clippy -- -D warnings`
   - `frontend` job: `npx tsc --noEmit`
-- [ ] **13.2** Verify CI passes on a clean push
+- [x] **13.2** Verify CI passes on a clean push
 
 ## Phase 14: Polish & Release
 
