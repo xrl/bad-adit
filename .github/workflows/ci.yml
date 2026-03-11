@@ -30,30 +30,21 @@ jobs:
             echo "PasswordAuthentication no"
             echo "AllowTcpForwarding yes"
             echo "StrictModes no"
+            echo "LogLevel DEBUG3"
             echo "AuthorizedKeysFile $HOME/.ssh/authorized_keys"
           } | sudo tee /etc/ssh/sshd_test_config > /dev/null
 
           sudo mkdir -p /run/sshd
-          sudo /usr/sbin/sshd -f /etc/ssh/sshd_test_config -ddd 2>/tmp/sshd_debug.log &
-          SSHD_PID=$!
-
-          # Also start non-debug sshd
-          sudo /usr/sbin/sshd -f /etc/ssh/sshd_test_config
+          sudo /usr/sbin/sshd -f /etc/ssh/sshd_test_config -E /tmp/sshd.log
 
           # Start TCP echo server
           socat TCP-LISTEN:9999,fork,reuseaddr EXEC:cat &
 
           # Verify sshd is up
           sleep 1
-          ssh -vvv -o StrictHostKeyChecking=accept-new -o BatchMode=yes -i /tmp/test_key -p 2222 127.0.0.1 echo "SSH OK" 2>&1 || {
-            echo "=== sshd debug log ==="
-            sudo cat /tmp/sshd_debug.log 2>/dev/null || true
-            echo "=== authorized_keys ==="
-            cat ~/.ssh/authorized_keys
-            echo "=== sshd config ==="
-            cat /etc/ssh/sshd_test_config
-            echo "=== home dir perms ==="
-            ls -la ~/ ~/.ssh/
+          ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -i /tmp/test_key -p 2222 127.0.0.1 echo "SSH OK" 2>&1 || {
+            echo "=== sshd log ==="
+            sudo cat /tmp/sshd.log
             exit 1
           }
 
