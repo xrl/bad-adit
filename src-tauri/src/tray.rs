@@ -1,5 +1,6 @@
 use crate::error_log::ErrorLog;
 use crate::format::format_bytes;
+use crate::notify;
 use crate::tunnel::{TunnelManager, TunnelState, TunnelStatus};
 use std::sync::{Arc, Mutex};
 use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder};
@@ -33,19 +34,26 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         let mut last_error_count: usize = 0;
         loop {
             interval.tick().await;
-            let statuses: Vec<TunnelStatus> = {
+            let (statuses, dead_tunnels): (Vec<TunnelStatus>, Vec<String>) = {
                 let manager = refresh_handle.state::<TunnelManager>();
-                let inner = manager.0.lock().await;
-                inner.get_all_status()
+                let error_log = refresh_handle.state::<ErrorLog>();
+                let mut inner = manager.0.lock().await;
+                let dead = inner.check_ssh_health(&error_log);
+                let statuses = inner.get_all_status();
+                (statuses, dead)
             };
             let error_count = {
                 let log = refresh_handle.state::<ErrorLog>();
                 log.error_count()
             };
 
+            // Send macOS notifications for any tunnels that just died
+            for name in &dead_tunnels {
+                notify::send_notification("Bad Adit", &format!("Tunnel '{}' disconnected", name));
+            }
+
             // Skip if nothing changed
-            let current_labels: Vec<String> =
-                statuses.iter().map(format_status_label).collect();
+            let current_labels: Vec<String> = statuses.iter().map(format_status_label).collect();
             if current_labels == last_labels && error_count == last_error_count {
                 continue;
             }

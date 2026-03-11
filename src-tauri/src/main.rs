@@ -4,6 +4,7 @@ mod commands;
 mod config;
 mod error_log;
 mod format;
+mod notify;
 mod proxy;
 mod ssh;
 mod stats;

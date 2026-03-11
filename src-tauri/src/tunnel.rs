@@ -1,4 +1,5 @@
 use crate::config::{ConfigStore, TunnelConfig};
+use crate::error_log::ErrorLog;
 use crate::proxy::ProxyListener;
 use crate::ssh::{self, SshProcess};
 use crate::stats::{StatsSnapshot, TunnelStats};
@@ -178,6 +179,34 @@ impl TunnelManagerInner {
                 }
             })
             .collect()
+    }
+
+    /// Check all running tunnels for dead SSH processes.
+    /// Returns a list of (tunnel_name, error_message) for tunnels that died.
+    pub fn check_ssh_health(&mut self, error_log: &ErrorLog) -> Vec<String> {
+        let mut dead_tunnels = Vec::new();
+
+        for (id, tunnel) in &mut self.tunnels {
+            if tunnel.state != TunnelState::Running {
+                continue;
+            }
+            if let Some(ref mut ssh) = tunnel.ssh {
+                if let Some(status) = ssh.try_wait() {
+                    let name = tunnel.config.name.clone();
+                    let msg = if status.success() {
+                        "SSH process exited unexpectedly".to_string()
+                    } else {
+                        format!("SSH process exited with {}", status)
+                    };
+                    log::warn!("Tunnel '{}' ({}): {}", name, id, msg);
+                    error_log.error(msg, Some(name.clone()));
+                    tunnel.state = TunnelState::Error("SSH process died".to_string());
+                    dead_tunnels.push(name);
+                }
+            }
+        }
+
+        dead_tunnels
     }
 
     pub fn get_tunnel_stats(&self, id: &str) -> Result<StatsSnapshot, String> {

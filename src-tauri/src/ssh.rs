@@ -57,6 +57,12 @@ impl SshProcess {
         Ok(())
     }
 
+    /// Non-blocking check if the SSH process has exited.
+    /// Returns Some(status) if exited, None if still running.
+    pub fn try_wait(&mut self) -> Option<ExitStatus> {
+        self.child.try_wait().ok().flatten()
+    }
+
     #[allow(dead_code)]
     pub async fn wait_for_exit(&mut self) -> Result<ExitStatus, String> {
         self.child
