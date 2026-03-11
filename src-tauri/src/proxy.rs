@@ -108,7 +108,8 @@ while True:
             .map_err(|e| format!("Failed to launch osascript for privileged port: {}", e))?;
 
         // Wait for the privileged proxy to start listening
-        match wait_for_port(local_port, 15, 200).await {
+        // Allow up to 60 seconds for the user to approve the admin dialog
+        match wait_for_port(local_port, 120, 500).await {
             Ok(()) => {}
             Err(e) => {
                 return Err(format!(
