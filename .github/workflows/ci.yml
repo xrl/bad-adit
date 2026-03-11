@@ -22,7 +22,15 @@ jobs:
           chmod 700 ~/.ssh
           chmod 600 ~/.ssh/authorized_keys
 
-          printf 'Port 2222\nListenAddress 127.0.0.1\nHostKey /etc/ssh/ssh_host_ed25519_key\nPubkeyAuthentication yes\nPasswordAuthentication no\nAllowTcpForwarding yes\nAuthorizedKeysFile %h/.ssh/authorized_keys\n' | sudo tee /etc/ssh/sshd_test_config > /dev/null
+          {
+            echo "Port 2222"
+            echo "ListenAddress 127.0.0.1"
+            echo "HostKey /etc/ssh/ssh_host_ed25519_key"
+            echo "PubkeyAuthentication yes"
+            echo "PasswordAuthentication no"
+            echo "AllowTcpForwarding yes"
+            echo "AuthorizedKeysFile %h/.ssh/authorized_keys"
+          } | sudo tee /etc/ssh/sshd_test_config > /dev/null
 
           sudo mkdir -p /run/sshd
           sudo /usr/sbin/sshd -f /etc/ssh/sshd_test_config
