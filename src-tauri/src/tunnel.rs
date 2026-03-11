@@ -117,6 +117,15 @@ impl TunnelManagerInner {
         Ok(())
     }
 
+    pub async fn stop_all_tunnels(&mut self) {
+        let ids: Vec<String> = self.tunnels.keys().cloned().collect();
+        for id in ids {
+            if let Err(e) = self.stop_tunnel(&id).await {
+                log::error!("Failed to stop tunnel {} during shutdown: {}", id, e);
+            }
+        }
+    }
+
     pub async fn restart_tunnel(
         &mut self,
         id: &str,

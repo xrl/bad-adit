@@ -17,7 +17,10 @@ export async function renderTunnelList(container: HTMLElement) {
   container.innerHTML = `
     <div class="header">
       <h1>Tunnels</h1>
-      <button class="primary" id="add-btn">Add</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="error-badge" class="error-badge" style="display:none"></span>
+        <button class="primary" id="add-btn">Add</button>
+      </div>
     </div>
     <div class="tunnel-list" id="tunnel-list">
       <div class="empty-state">Loading...</div>
@@ -27,6 +30,17 @@ export async function renderTunnelList(container: HTMLElement) {
   document.getElementById('add-btn')!.addEventListener('click', () => {
     navigate({ view: 'add' });
   });
+
+  // Show error badge if there are errors
+  try {
+    const errorCount: number = await invoke('get_error_count');
+    if (errorCount > 0) {
+      const badge = document.getElementById('error-badge')!;
+      badge.textContent = `${errorCount} error${errorCount === 1 ? '' : 's'}`;
+      badge.style.display = 'inline-flex';
+      badge.addEventListener('click', () => navigate({ view: 'console' }));
+    }
+  } catch { /* ignore */ }
 
   try {
     const tunnels: TunnelConfig[] = await invoke('get_tunnels');

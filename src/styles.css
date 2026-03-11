@@ -402,3 +402,93 @@ button.danger:hover {
   color: var(--warning);
   font-size: 12px;
 }
+
+/* Error Console */
+
+.console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.log-entry {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+  margin-bottom: 2px;
+}
+
+.log-entry.log-error {
+  background: rgba(239, 83, 80, 0.08);
+}
+
+.log-entry.log-warn {
+  background: rgba(255, 167, 38, 0.08);
+}
+
+.log-entry.log-info {
+  background: rgba(79, 195, 247, 0.05);
+}
+
+.log-time {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.log-level {
+  flex-shrink: 0;
+  font-weight: 600;
+  width: 44px;
+}
+
+.log-error .log-level {
+  color: var(--danger);
+}
+
+.log-warn .log-level {
+  color: var(--warning);
+}
+
+.log-info .log-level {
+  color: var(--accent);
+}
+
+.log-tunnel {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.log-tunnel::before {
+  content: "[";
+}
+
+.log-tunnel::after {
+  content: "]";
+}
+
+.log-message {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.error-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(239, 83, 80, 0.15);
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.error-badge:hover {
+  background: rgba(239, 83, 80, 0.25);
+}

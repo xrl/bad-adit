@@ -1,4 +1,5 @@
 use crate::config::{self, TunnelConfig};
+use crate::error_log::{ErrorLog, LogEntry};
 use crate::stats::StatsSnapshot;
 use crate::tunnel::{TunnelManager, TunnelStatus};
 use std::env;
@@ -74,7 +75,11 @@ pub async fn remove_tunnel(id: String, manager: State<'_, TunnelManager>) -> Res
 }
 
 #[tauri::command]
-pub async fn start_tunnel(id: String, manager: State<'_, TunnelManager>) -> Result<(), String> {
+pub async fn start_tunnel(
+    id: String,
+    manager: State<'_, TunnelManager>,
+    error_log: State<'_, ErrorLog>,
+) -> Result<(), String> {
     let mut inner = manager.0.lock().await;
     let configs = inner.config_store.load();
     let config = configs
@@ -82,7 +87,17 @@ pub async fn start_tunnel(id: String, manager: State<'_, TunnelManager>) -> Resu
         .find(|c| c.id == id)
         .ok_or_else(|| format!("Tunnel {} not found", id))?;
 
-    inner.start_tunnel(&config).await
+    let tunnel_name = config.name.clone();
+    match inner.start_tunnel(&config).await {
+        Ok(()) => {
+            error_log.info(format!("Tunnel started"), Some(tunnel_name));
+            Ok(())
+        }
+        Err(e) => {
+            error_log.error(e.clone(), Some(tunnel_name));
+            Err(e)
+        }
+    }
 }
 
 #[tauri::command]
@@ -123,4 +138,19 @@ pub async fn get_all_tunnel_status(
 ) -> Result<Vec<TunnelStatus>, String> {
     let inner = manager.0.lock().await;
     Ok(inner.get_all_status())
+}
+
+#[tauri::command]
+pub fn get_error_log(error_log: State<'_, ErrorLog>) -> Vec<LogEntry> {
+    error_log.get_all()
+}
+
+#[tauri::command]
+pub fn get_error_count(error_log: State<'_, ErrorLog>) -> usize {
+    error_log.error_count()
+}
+
+#[tauri::command]
+pub fn clear_error_log(error_log: State<'_, ErrorLog>) {
+    error_log.clear();
 }

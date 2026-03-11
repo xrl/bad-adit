@@ -2,6 +2,7 @@
 
 mod commands;
 mod config;
+mod error_log;
 mod format;
 mod proxy;
 mod ssh;
@@ -9,6 +10,8 @@ mod stats;
 mod tray;
 mod tunnel;
 
+use error_log::ErrorLog;
+use tauri::Manager;
 use tunnel::TunnelManager;
 
 fn main() {
@@ -17,12 +20,24 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(TunnelManager::new())
+        .manage(ErrorLog::new())
         .setup(|app| {
             // Hide from dock (LSUIElement only works in bundled .app builds)
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             tray::setup_tray(app)?;
+
+            // Hide window on close instead of destroying it
+            let window = app.get_webview_window("main").unwrap();
+            let window_clone = window.clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window_clone.hide();
+                }
+            });
+
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -39,7 +54,16 @@ fn main() {
             commands::get_tunnel_stats,
             commands::get_all_tunnel_status,
             commands::get_home_dir,
+            commands::get_error_log,
+            commands::get_error_count,
+            commands::clear_error_log,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            // Keep the app running when all windows are closed (tray stays alive)
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                api.prevent_exit();
+            }
+        });
 }
