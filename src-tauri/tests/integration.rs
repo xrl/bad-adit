@@ -36,6 +36,7 @@ fn create_test_config(
     }
 }
 
+#[allow(dead_code)]
 struct TestTunnelConfig {
     ssh_host: String,
     ssh_port: u16,
