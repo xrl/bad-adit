@@ -1,6 +1,6 @@
 [package]
 name = "bad-adit"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "macOS menu bar app for managing SSH tunnels with stats"
 license = "MIT"
