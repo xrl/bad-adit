@@ -1,17 +1,31 @@
 use crate::error_log::ErrorLog;
 use crate::format::format_bytes;
 use crate::tunnel::{TunnelManager, TunnelState, TunnelStatus};
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use std::sync::{Arc, Mutex};
+use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder};
 use tauri::{AppHandle, Manager};
+
+/// Holds references to menu items that can be updated in-place.
+struct MenuState {
+    /// Tunnel item handles keyed by position, matching tunnel_ids order
+    tunnel_items: Vec<MenuItem<tauri::Wry>>,
+    /// IDs of tunnels in menu order — used to detect structural changes
+    tunnel_ids: Vec<String>,
+    /// Whether an error item is currently shown
+    has_error_item: bool,
+    /// Handle to the error menu item (if present)
+    error_item: Option<MenuItem<tauri::Wry>>,
+}
 
 pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
 
     // Build initial empty menu
-    build_menu_from_statuses(&handle, &[], 0)?;
+    let menu_state = build_menu_from_statuses(&handle, &[], 0)?;
+    let menu_state = Arc::new(Mutex::new(menu_state));
 
     // Set up periodic refresh — gather statuses on async task,
-    // but rebuild menu on the main thread to avoid race with macOS event processing
+    // but update menu on the main thread to avoid race with macOS event processing
     let refresh_handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
@@ -29,7 +43,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 log.error_count()
             };
 
-            // Only rebuild if something changed
+            // Skip if nothing changed
             let current_labels: Vec<String> = statuses
                 .iter()
                 .map(|s| format_status_label(s))
@@ -37,15 +51,51 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             if current_labels == last_labels && error_count == last_error_count {
                 continue;
             }
-            last_labels = current_labels;
+            last_labels = current_labels.clone();
             last_error_count = error_count;
 
-            let handle = refresh_handle.clone();
-            let _ = refresh_handle.run_on_main_thread(move || {
-                if let Err(e) = build_menu_from_statuses(&handle, &statuses, error_count) {
-                    log::error!("Failed to rebuild tray menu: {}", e);
-                }
-            });
+            // Check if structure changed (tunnel IDs or error item presence)
+            let current_ids: Vec<String> = statuses.iter().map(|s| s.id.clone()).collect();
+            let has_errors = error_count > 0;
+            let needs_rebuild = {
+                let state = menu_state.lock().unwrap();
+                state.tunnel_ids != current_ids || state.has_error_item != has_errors
+            };
+
+            if needs_rebuild {
+                // Structural change — full rebuild
+                let handle = refresh_handle.clone();
+                let menu_state = Arc::clone(&menu_state);
+                let _ = refresh_handle.run_on_main_thread(move || {
+                    match build_menu_from_statuses(&handle, &statuses, error_count) {
+                        Ok(new_state) => {
+                            *menu_state.lock().unwrap() = new_state;
+                        }
+                        Err(e) => {
+                            log::error!("Failed to rebuild tray menu: {}", e);
+                        }
+                    }
+                });
+            } else {
+                // Only labels changed — update text in-place
+                let menu_state = Arc::clone(&menu_state);
+                let _ = refresh_handle.run_on_main_thread(move || {
+                    let state = menu_state.lock().unwrap();
+                    for (i, label) in current_labels.iter().enumerate() {
+                        if let Some(item) = state.tunnel_items.get(i) {
+                            let _ = item.set_text(label);
+                        }
+                    }
+                    if let Some(ref error_item) = state.error_item {
+                        let error_label = format!(
+                            "⚠ {} error{}",
+                            error_count,
+                            if error_count == 1 { "" } else { "s" }
+                        );
+                        let _ = error_item.set_text(error_label);
+                    }
+                });
+            }
         }
     });
 
@@ -76,7 +126,7 @@ fn build_menu_from_statuses(
     handle: &AppHandle,
     statuses: &[TunnelStatus],
     error_count: usize,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<MenuState, Box<dyn std::error::Error>> {
     let mut menu_builder = MenuBuilder::new(handle);
 
     let title = MenuItemBuilder::with_id("title", "Bad Adit")
@@ -84,20 +134,26 @@ fn build_menu_from_statuses(
         .build(handle)?;
     menu_builder = menu_builder.item(&title).separator();
 
+    let mut tunnel_items = Vec::new();
+    let mut tunnel_ids = Vec::new();
     for status in statuses {
         let label = format_status_label(status);
         let item =
             MenuItemBuilder::with_id(format!("tunnel:{}", status.id), label).build(handle)?;
         menu_builder = menu_builder.item(&item);
+        tunnel_items.push(item);
+        tunnel_ids.push(status.id.clone());
     }
 
     menu_builder = menu_builder.separator();
 
+    let mut error_item_handle = None;
     if error_count > 0 {
         let error_label = format!("⚠ {} error{}", error_count, if error_count == 1 { "" } else { "s" });
         let error_item =
             MenuItemBuilder::with_id("show_errors", error_label).build(handle)?;
         menu_builder = menu_builder.item(&error_item);
+        error_item_handle = Some(error_item);
     }
 
     let edit_item =
@@ -113,7 +169,12 @@ fn build_menu_from_statuses(
         tray.set_menu(Some(menu))?;
     }
 
-    Ok(())
+    Ok(MenuState {
+        tunnel_items,
+        tunnel_ids,
+        has_error_item: error_count > 0,
+        error_item: error_item_handle,
+    })
 }
 
 pub fn handle_menu_event(app: &AppHandle, id: &str) {
