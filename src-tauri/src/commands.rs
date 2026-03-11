@@ -1,6 +1,7 @@
 use crate::config::{self, TunnelConfig};
 use crate::stats::StatsSnapshot;
 use crate::tunnel::{TunnelManager, TunnelStatus};
+use std::env;
 use tauri::State;
 
 #[tauri::command]
@@ -109,6 +110,11 @@ pub async fn get_tunnel_stats(
 ) -> Result<StatsSnapshot, String> {
     let inner = manager.0.lock().await;
     inner.get_tunnel_stats(&id)
+}
+
+#[tauri::command]
+pub fn get_home_dir() -> Result<String, String> {
+    env::var("HOME").map_err(|_| "Could not determine home directory".to_string())
 }
 
 #[tauri::command]

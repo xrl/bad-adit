@@ -38,6 +38,7 @@ fn main() {
             commands::restart_tunnel,
             commands::get_tunnel_stats,
             commands::get_all_tunnel_status,
+            commands::get_home_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
