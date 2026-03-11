@@ -137,6 +137,7 @@ fn is_permission_error(e: &std::io::Error) -> bool {
         || e.raw_os_error() == Some(1) // EPERM
 }
 
+#[allow(dead_code)]
 async fn wait_for_port(port: u16, retries: u32, delay_ms: u64) -> Result<(), String> {
     for i in 0..retries {
         match tokio::net::TcpStream::connect(format!("127.0.0.1:{}", port)).await {
