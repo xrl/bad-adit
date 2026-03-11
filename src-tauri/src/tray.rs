@@ -9,24 +9,60 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Build initial empty menu
     build_menu_from_statuses(&handle, &[])?;
 
-    // Set up periodic refresh
+    // Set up periodic refresh — gather statuses on async task,
+    // but rebuild menu on the main thread to avoid race with macOS event processing
     let refresh_handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+        let mut last_labels: Vec<String> = Vec::new();
         loop {
             interval.tick().await;
-            let statuses = {
+            let statuses: Vec<TunnelStatus> = {
                 let manager = refresh_handle.state::<TunnelManager>();
                 let inner = manager.0.lock().await;
                 inner.get_all_status()
             };
-            if let Err(e) = build_menu_from_statuses(&refresh_handle, &statuses) {
-                log::error!("Failed to rebuild tray menu: {}", e);
+
+            // Only rebuild if something changed
+            let current_labels: Vec<String> = statuses
+                .iter()
+                .map(|s| format_status_label(s))
+                .collect();
+            if current_labels == last_labels {
+                continue;
             }
+            last_labels = current_labels;
+
+            let handle = refresh_handle.clone();
+            let _ = refresh_handle.run_on_main_thread(move || {
+                if let Err(e) = build_menu_from_statuses(&handle, &statuses) {
+                    log::error!("Failed to rebuild tray menu: {}", e);
+                }
+            });
         }
     });
 
     Ok(())
+}
+
+fn format_status_label(status: &TunnelStatus) -> String {
+    let icon = match &status.state {
+        TunnelState::Running => "●",
+        TunnelState::Starting | TunnelState::Reconnecting => "◐",
+        _ => "○",
+    };
+
+    if let Some(ref stats) = status.stats {
+        format!(
+            "{} {}  ↑ {}  ↓ {}",
+            icon,
+            status.name,
+            format_bytes(stats.bytes_uploaded),
+            format_bytes(stats.bytes_downloaded)
+        )
+    } else {
+        format!("{} {}", icon, status.name)
+    }
 }
 
 fn build_menu_from_statuses(
@@ -41,24 +77,7 @@ fn build_menu_from_statuses(
     menu_builder = menu_builder.item(&title).separator();
 
     for status in statuses {
-        let icon = match &status.state {
-            TunnelState::Running => "●",
-            TunnelState::Starting | TunnelState::Reconnecting => "◐",
-            _ => "○",
-        };
-
-        let label = if let Some(ref stats) = status.stats {
-            format!(
-                "{} {}  ↑ {}  ↓ {}",
-                icon,
-                status.name,
-                format_bytes(stats.bytes_uploaded),
-                format_bytes(stats.bytes_downloaded)
-            )
-        } else {
-            format!("{} {}", icon, status.name)
-        };
-
+        let label = format_status_label(status);
         let item =
             MenuItemBuilder::with_id(format!("tunnel:{}", status.id), label).build(handle)?;
         menu_builder = menu_builder.item(&item);
@@ -82,6 +101,10 @@ fn build_menu_from_statuses(
 pub fn handle_menu_event(app: &AppHandle, id: &str) {
     if id == "edit_configs" {
         if let Some(window) = app.get_webview_window("main") {
+            // Unminimize if needed, then show and focus
+            if window.is_minimized().unwrap_or(false) {
+                let _ = window.unminimize();
+            }
             let _ = window.show();
             let _ = window.set_focus();
         }
