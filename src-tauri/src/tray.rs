@@ -44,10 +44,8 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             };
 
             // Skip if nothing changed
-            let current_labels: Vec<String> = statuses
-                .iter()
-                .map(|s| format_status_label(s))
-                .collect();
+            let current_labels: Vec<String> =
+                statuses.iter().map(|s| format_status_label(s)).collect();
             if current_labels == last_labels && error_count == last_error_count {
                 continue;
             }
@@ -149,9 +147,12 @@ fn build_menu_from_statuses(
 
     let mut error_item_handle = None;
     if error_count > 0 {
-        let error_label = format!("⚠ {} error{}", error_count, if error_count == 1 { "" } else { "s" });
-        let error_item =
-            MenuItemBuilder::with_id("show_errors", error_label).build(handle)?;
+        let error_label = format!(
+            "⚠ {} error{}",
+            error_count,
+            if error_count == 1 { "" } else { "s" }
+        );
+        let error_item = MenuItemBuilder::with_id("show_errors", error_label).build(handle)?;
         menu_builder = menu_builder.item(&error_item);
         error_item_handle = Some(error_item);
     }
@@ -220,10 +221,7 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
                     .tunnels
                     .get(&tunnel_id)
                     .is_some_and(|t| t.state == TunnelState::Running);
-                let name = inner
-                    .tunnels
-                    .get(&tunnel_id)
-                    .map(|t| t.config.name.clone());
+                let name = inner.tunnels.get(&tunnel_id).map(|t| t.config.name.clone());
                 (running, name)
             };
 

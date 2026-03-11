@@ -145,7 +145,10 @@ async fn wait_for_port(port: u16, retries: u32, delay_ms: u64) -> Result<(), Str
                 tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
             }
             Err(e) => {
-                return Err(format!("Port {} not ready after {} retries: {}", port, retries, e));
+                return Err(format!(
+                    "Port {} not ready after {} retries: {}",
+                    port, retries, e
+                ));
             }
         }
     }
@@ -269,16 +272,18 @@ pub fn run_privileged_forwarder(local_port: u16, target_port: u16, parent_pid: u
         // kill(pid, 0) checks if process exists without sending a signal
         let alive = unsafe { libc::kill(parent_pid as i32, 0) };
         if alive != 0 {
-            eprintln!("Parent process {} exited, shutting down forwarder", parent_pid);
+            eprintln!(
+                "Parent process {} exited, shutting down forwarder",
+                parent_pid
+            );
             std::process::exit(0);
         }
     });
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port))
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to bind port {}: {}", local_port, e);
-            std::process::exit(1);
-        });
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port)).unwrap_or_else(|e| {
+        eprintln!("Failed to bind port {}: {}", local_port, e);
+        std::process::exit(1);
+    });
 
     for stream in listener.incoming() {
         match stream {
@@ -295,10 +300,7 @@ pub fn run_privileged_forwarder(local_port: u16, target_port: u16, parent_pid: u
         }
     }
 
-    fn forward_connection(
-        mut client: TcpStream,
-        target_port: u16,
-    ) -> Result<(), std::io::Error> {
+    fn forward_connection(mut client: TcpStream, target_port: u16) -> Result<(), std::io::Error> {
         let mut target = TcpStream::connect(format!("127.0.0.1:{}", target_port))?;
         let mut client_clone = client.try_clone()?;
         let mut target_clone = target.try_clone()?;
