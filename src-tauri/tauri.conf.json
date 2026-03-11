@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicholasxjy/tauri-conf-json-schema/refs/heads/main/schema.json",
+  "productName": "Bad Adit",
+  "version": "0.1.0",
+  "identifier": "com.tureus.bad-adit",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "Bad Adit",
+        "width": 700,
+        "height": 500,
+        "visible": false
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/tray-red.png",
+      "iconAsTemplate": true
+    }
+  },
+  "plugins": {
+    "dialog": {}
+  }
+}

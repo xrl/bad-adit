@@ -1,0 +1,82 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf socat
+
+      - name: Set up test SSH environment
+        run: |
+          ssh-keygen -t ed25519 -N "" -f /tmp/test_key
+          mkdir -p ~/.ssh
+          cat /tmp/test_key.pub >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+
+          sudo tee /etc/ssh/sshd_test_config <<SSHEOF
+          Port 2222
+          ListenAddress 127.0.0.1
+          HostKey /etc/ssh/ssh_host_ed25519_key
+          PubkeyAuthentication yes
+          PasswordAuthentication no
+          AllowTcpForwarding yes
+          SSHEOF
+          sudo /usr/sbin/sshd -f /etc/ssh/sshd_test_config
+
+          # Start TCP echo server
+          socat TCP-LISTEN:9999,fork,reuseaddr EXEC:cat &
+
+          # Verify sshd is up
+          sleep 1
+          ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -i /tmp/test_key -p 2222 127.0.0.1 echo "SSH OK"
+
+      - name: Run unit tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Run integration tests
+        working-directory: src-tauri
+        env:
+          TEST_SSH_PORT: "2222"
+          TEST_SSH_KEY: "/tmp/test_key"
+          TEST_ECHO_PORT: "9999"
+        run: cargo test --test integration
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Check formatting
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Run clippy
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx tsc --noEmit
