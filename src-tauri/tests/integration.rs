@@ -198,14 +198,15 @@ async fn multiple_concurrent_connections() {
     for _ in 0..3 {
         drop(clients.pop());
     }
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    // Wait for relay tasks to detect EOF through SSH tunnel
+    tokio::time::sleep(Duration::from_millis(1000)).await;
     let snap = stats.snapshot();
     assert_eq!(snap.connections_open, 2);
     assert_eq!(snap.connections_total, 5);
 
     // Close remaining
     clients.clear();
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(1000)).await;
     let snap = stats.snapshot();
     assert_eq!(snap.connections_open, 0);
 
