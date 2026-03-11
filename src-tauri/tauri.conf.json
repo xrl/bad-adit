@@ -24,7 +24,5 @@
       "iconAsTemplate": true
     }
   },
-  "plugins": {
-    "dialog": {}
-  }
+  "plugins": {}
 }

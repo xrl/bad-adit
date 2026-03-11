@@ -11,7 +11,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     // Set up periodic refresh
     let refresh_handle = handle.clone();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
         loop {
             interval.tick().await;
@@ -91,7 +91,7 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
     if let Some(tunnel_id) = id.strip_prefix("tunnel:") {
         let tunnel_id = tunnel_id.to_string();
         let handle = app.clone();
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let manager = handle.state::<TunnelManager>();
 
             let is_running = {

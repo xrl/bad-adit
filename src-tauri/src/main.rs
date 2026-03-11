@@ -18,6 +18,10 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(TunnelManager::new())
         .setup(|app| {
+            // Hide from dock (LSUIElement only works in bundled .app builds)
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             tray::setup_tray(app)?;
             Ok(())
         })
