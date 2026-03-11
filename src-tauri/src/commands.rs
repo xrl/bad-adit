@@ -90,7 +90,7 @@ pub async fn start_tunnel(
     let tunnel_name = config.name.clone();
     match inner.start_tunnel(&config).await {
         Ok(()) => {
-            error_log.info(format!("Tunnel started"), Some(tunnel_name));
+            error_log.info("Tunnel started".to_string(), Some(tunnel_name));
             Ok(())
         }
         Err(e) => {

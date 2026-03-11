@@ -45,7 +45,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
             // Skip if nothing changed
             let current_labels: Vec<String> =
-                statuses.iter().map(|s| format_status_label(s)).collect();
+                statuses.iter().map(format_status_label).collect();
             if current_labels == last_labels && error_count == last_error_count {
                 continue;
             }
