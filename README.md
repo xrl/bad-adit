@@ -20,9 +20,21 @@ Bad Adit spawns `ssh -L` processes and proxies TCP traffic through them. The pro
 [your app] → [local port] → [proxy] → [ssh -L ephemeral:target] → [remote host:port]
 ```
 
-## Prerequisites
+## Install
 
-- macOS (primary target)
+```sh
+brew install xrl/bad-adit/bad-adit
+```
+
+This taps the repo and installs the latest release. To update later:
+
+```sh
+brew upgrade bad-adit
+```
+
+## Prerequisites (development)
+
+- macOS (Apple Silicon)
 - [Rust toolchain](https://rustup.rs/) (1.75+)
 - [Node.js](https://nodejs.org/) (22+)
 - SSH client (ships with macOS)
