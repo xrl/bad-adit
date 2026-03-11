@@ -99,7 +99,7 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
                 inner
                     .tunnels
                     .get(&tunnel_id)
-                    .map_or(false, |t| t.state == TunnelState::Running)
+                    .is_some_and(|t| t.state == TunnelState::Running)
             };
 
             if is_running {

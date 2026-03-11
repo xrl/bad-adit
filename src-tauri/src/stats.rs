@@ -24,6 +24,12 @@ pub struct StatsSnapshot {
     pub last_reconnect_ago: Option<String>,
 }
 
+impl Default for TunnelStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TunnelStats {
     pub fn new() -> Self {
         Self {

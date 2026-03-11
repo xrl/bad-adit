@@ -4,6 +4,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
 
+#[allow(dead_code)]
 pub struct SshProcess {
     child: Child,
     pub ephemeral_port: u16,
@@ -56,6 +57,7 @@ impl SshProcess {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn wait_for_exit(&mut self) -> Result<ExitStatus, String> {
         self.child
             .wait()

@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+#[allow(dead_code)]
 pub enum TunnelState {
     Stopped,
     Starting,
@@ -28,6 +29,7 @@ pub struct TunnelStatus {
     pub target_port: u16,
 }
 
+#[allow(dead_code)]
 pub struct RunningTunnel {
     pub config: TunnelConfig,
     pub state: TunnelState,
@@ -44,6 +46,12 @@ pub struct TunnelManager(pub Mutex<TunnelManagerInner>);
 pub struct TunnelManagerInner {
     pub config_store: ConfigStore,
     pub tunnels: HashMap<String, RunningTunnel>,
+}
+
+impl Default for TunnelManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TunnelManager {
