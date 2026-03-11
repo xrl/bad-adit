@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "bad-adit-v*"
 
 concurrency:
   group: ${{ github.ref }}
