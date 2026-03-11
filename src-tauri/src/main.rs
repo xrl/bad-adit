@@ -15,6 +15,15 @@ use tauri::Manager;
 use tunnel::TunnelManager;
 
 fn main() {
+    // Check for privileged forwarder mode before initializing Tauri
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() == 4 && args[1] == "--privileged-forwarder" {
+        let local_port: u16 = args[2].parse().expect("invalid local port");
+        let target_port: u16 = args[3].parse().expect("invalid target port");
+        proxy::run_privileged_forwarder(local_port, target_port);
+        return;
+    }
+
     env_logger::init();
 
     tauri::Builder::default()

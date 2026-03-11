@@ -50,40 +50,35 @@ impl ProxyListener {
     async fn start_privileged(
         local_port: u16,
         ephemeral_port: u16,
-        _stats: Arc<TunnelStats>,
+        stats: Arc<TunnelStats>,
     ) -> Result<Self, String> {
         use tokio::process::Command;
 
-        // Spawn a privileged TCP forwarder via osascript
-        // The forwarder listens on the privileged port and forwards to ephemeral
-        let python_script = format!(
-            r#"import socket,threading,sys,signal,os
-signal.signal(signal.SIGTERM, lambda *a: os._exit(0))
-s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-s.bind(('127.0.0.1',{local_port}))
-s.listen(128)
-def fwd(a,b):
- try:
-  while True:
-   d=a.recv(8192)
-   if not d:break
-   b.sendall(d)
- except:pass
- finally:a.close();b.close()
-while True:
- c,_=s.accept()
- try:
-  r=socket.socket()
-  r.connect(('127.0.0.1',{ephemeral_port}))
-  threading.Thread(target=fwd,args=(c,r),daemon=True).start()
-  threading.Thread(target=fwd,args=(r,c),daemon=True).start()
- except:c.close()"#
-        );
+        // Start a stats-tracking proxy on a random port that forwards to the SSH tunnel
+        let stats_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|e| format!("Failed to bind stats proxy: {}", e))?;
+        let stats_port = stats_listener
+            .local_addr()
+            .map_err(|e| format!("Failed to get stats proxy addr: {}", e))?
+            .port();
+
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let task = tokio::spawn(accept_loop(
+            stats_listener,
+            ephemeral_port,
+            stats,
+            shutdown_rx,
+        ));
+
+        // Re-exec ourselves as root via osascript to bind the privileged port
+        let exe = std::env::current_exe()
+            .map_err(|e| format!("Failed to get current exe path: {}", e))?;
+        let exe_str = exe.to_string_lossy();
 
         let shell_cmd = format!(
-            "python3 -c '{}'",
-            python_script.replace('\'', "'\"'\"'")
+            "{} --privileged-forwarder {} {}",
+            exe_str, local_port, stats_port
         );
 
         let applescript = format!(
@@ -92,9 +87,9 @@ while True:
         );
 
         log::info!(
-            "Requesting admin privileges for port {} (forwarding to {})",
+            "Requesting admin privileges for port {} (forwarding via stats proxy on {})",
             local_port,
-            ephemeral_port
+            stats_port
         );
 
         let child = Command::new("osascript")
@@ -107,25 +102,17 @@ while True:
             .spawn()
             .map_err(|e| format!("Failed to launch osascript for privileged port: {}", e))?;
 
-        // Wait for the privileged proxy to start listening
         // Allow up to 60 seconds for the user to approve the admin dialog
         match wait_for_port(local_port, 120, 500).await {
             Ok(()) => {}
             Err(e) => {
+                let _ = shutdown_tx.send(true);
                 return Err(format!(
                     "Privileged proxy on port {} did not start (authorization may have been denied): {}",
                     local_port, e
                 ));
             }
         }
-
-        // Now connect our stats-tracking proxy to the privileged forwarder
-        // by listening on a separate internal port and piping through
-        // Actually, we can just track stats by intercepting at the ephemeral level
-        // For now, the privileged forwarder handles the traffic directly
-
-        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
-        let task = tokio::spawn(async {});
 
         Ok(Self {
             shutdown_tx,
@@ -260,6 +247,84 @@ async fn relay(
 
     let (r1, r2) = tokio::join!(upload, download);
     r1.and(r2)
+}
+
+/// Minimal TCP forwarder for privileged port mode.
+/// Runs as root via osascript, binds the privileged port,
+/// and forwards connections to the stats proxy port.
+pub fn run_privileged_forwarder(local_port: u16, target_port: u16) {
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
+
+    // Handle SIGTERM gracefully
+    unsafe {
+        libc::signal(libc::SIGTERM, libc::SIG_DFL);
+    }
+
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port))
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to bind port {}: {}", local_port, e);
+            std::process::exit(1);
+        });
+
+    for stream in listener.incoming() {
+        match stream {
+            Ok(client) => {
+                thread::spawn(move || {
+                    if let Err(e) = forward_connection(client, target_port) {
+                        eprintln!("Forward error: {}", e);
+                    }
+                });
+            }
+            Err(e) => {
+                eprintln!("Accept error: {}", e);
+            }
+        }
+    }
+
+    fn forward_connection(
+        mut client: TcpStream,
+        target_port: u16,
+    ) -> Result<(), std::io::Error> {
+        let mut target = TcpStream::connect(format!("127.0.0.1:{}", target_port))?;
+        let mut client_clone = client.try_clone()?;
+        let mut target_clone = target.try_clone()?;
+
+        let t1 = thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            loop {
+                match client.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if target.write_all(&buf[..n]).is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+            let _ = target.shutdown(std::net::Shutdown::Write);
+        });
+
+        let t2 = thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            loop {
+                match target_clone.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if client_clone.write_all(&buf[..n]).is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+            let _ = client_clone.shutdown(std::net::Shutdown::Write);
+        });
+
+        let _ = t1.join();
+        let _ = t2.join();
+        Ok(())
+    }
 }
 
 #[cfg(test)]
