@@ -76,9 +76,10 @@ impl ProxyListener {
             .map_err(|e| format!("Failed to get current exe path: {}", e))?;
         let exe_str = exe.to_string_lossy();
 
+        let parent_pid = std::process::id();
         let shell_cmd = format!(
-            "{} --privileged-forwarder {} {}",
-            exe_str, local_port, stats_port
+            "{} --privileged-forwarder {} {} {}",
+            exe_str, local_port, stats_port, parent_pid
         );
 
         let applescript = format!(
@@ -252,7 +253,7 @@ async fn relay(
 /// Minimal TCP forwarder for privileged port mode.
 /// Runs as root via osascript, binds the privileged port,
 /// and forwards connections to the stats proxy port.
-pub fn run_privileged_forwarder(local_port: u16, target_port: u16) {
+pub fn run_privileged_forwarder(local_port: u16, target_port: u16, parent_pid: u32) {
     use std::io::{Read, Write};
     use std::net::{TcpListener, TcpStream};
     use std::thread;
@@ -261,6 +262,17 @@ pub fn run_privileged_forwarder(local_port: u16, target_port: u16) {
     unsafe {
         libc::signal(libc::SIGTERM, libc::SIG_DFL);
     }
+
+    // Watchdog: exit when parent process dies (e.g. cargo tauri dev restart)
+    thread::spawn(move || loop {
+        thread::sleep(std::time::Duration::from_secs(2));
+        // kill(pid, 0) checks if process exists without sending a signal
+        let alive = unsafe { libc::kill(parent_pid as i32, 0) };
+        if alive != 0 {
+            eprintln!("Parent process {} exited, shutting down forwarder", parent_pid);
+            std::process::exit(0);
+        }
+    });
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port))
         .unwrap_or_else(|e| {

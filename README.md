@@ -16,9 +16,31 @@ Bad Adit is a macOS menu bar app for managing SSH tunnels. No more lost terminal
 
 Bad Adit spawns `ssh -L` processes and proxies TCP traffic through them. The proxy layer sits between your local port and SSH's ephemeral port, counting every byte that flows through. This gives you accurate per-tunnel traffic stats without touching the SSH protocol.
 
+For unprivileged ports (≥1024):
+
 ```
-[your app] → [local port] → [proxy] → [ssh -L ephemeral:target] → [remote host:port]
+[your app] → [local port: proxy] → [ephemeral port: ssh -L] → [remote host:port]
 ```
+
+### Privileged Ports (<1024)
+
+Binding ports below 1024 requires root. Bad Adit handles this transparently using a self-exec pattern with macOS's native admin authorization dialog:
+
+```
+[your app] → [port 443: root forwarder] → [random port: stats proxy] → [ephemeral port: ssh -L] → [remote host:port]
+```
+
+When you configure a tunnel on a privileged port (e.g. 443), Bad Adit:
+
+1. **Binds a stats proxy** on a random unprivileged port that tracks bytes and forwards to the SSH tunnel's ephemeral port
+2. **Re-executes itself** as root via `osascript "do shell script ... with administrator privileges"`, passing `--privileged-forwarder <local_port> <stats_port> <parent_pid>`
+3. The **root forwarder** binds the privileged port and forwards all TCP connections to the stats proxy
+
+This keeps the root process minimal (a simple TCP forwarder with no Tauri/tokio dependencies) while the unprivileged main process handles stats tracking, SSH management, and UI.
+
+#### Orphan Prevention
+
+The root forwarder includes a **parent-PID watchdog** that polls every 2 seconds using `kill(parent_pid, 0)`. If the parent process exits (e.g. `cargo tauri dev` restarts, crash, or normal shutdown), the forwarder exits immediately. This prevents orphaned root processes that would squat on the privileged port.
 
 ## Install
 
