@@ -5,8 +5,8 @@ use crate::stats::{StatsSnapshot, TunnelStats};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum TunnelState {

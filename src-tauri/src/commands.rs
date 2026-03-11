@@ -49,10 +49,7 @@ pub async fn update_tunnel(
 }
 
 #[tauri::command]
-pub async fn remove_tunnel(
-    id: String,
-    manager: State<'_, TunnelManager>,
-) -> Result<(), String> {
+pub async fn remove_tunnel(id: String, manager: State<'_, TunnelManager>) -> Result<(), String> {
     let mut inner = manager.0.lock().await;
 
     // Stop the tunnel if running
@@ -76,10 +73,7 @@ pub async fn remove_tunnel(
 }
 
 #[tauri::command]
-pub async fn start_tunnel(
-    id: String,
-    manager: State<'_, TunnelManager>,
-) -> Result<(), String> {
+pub async fn start_tunnel(id: String, manager: State<'_, TunnelManager>) -> Result<(), String> {
     let mut inner = manager.0.lock().await;
     let configs = inner.config_store.load();
     let config = configs
@@ -91,19 +85,13 @@ pub async fn start_tunnel(
 }
 
 #[tauri::command]
-pub async fn stop_tunnel(
-    id: String,
-    manager: State<'_, TunnelManager>,
-) -> Result<(), String> {
+pub async fn stop_tunnel(id: String, manager: State<'_, TunnelManager>) -> Result<(), String> {
     let mut inner = manager.0.lock().await;
     inner.stop_tunnel(&id).await
 }
 
 #[tauri::command]
-pub async fn restart_tunnel(
-    id: String,
-    manager: State<'_, TunnelManager>,
-) -> Result<(), String> {
+pub async fn restart_tunnel(id: String, manager: State<'_, TunnelManager>) -> Result<(), String> {
     let mut inner = manager.0.lock().await;
     let configs = inner.config_store.load();
     let config = configs

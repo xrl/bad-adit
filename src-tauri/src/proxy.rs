@@ -113,10 +113,7 @@ async fn relay(
     let download = async move {
         let mut buf = [0u8; 8192];
         loop {
-            let n = ssh_read
-                .read(&mut buf)
-                .await
-                .map_err(|e| e.to_string())?;
+            let n = ssh_read.read(&mut buf).await.map_err(|e| e.to_string())?;
             if n == 0 {
                 let _ = client_write.shutdown().await;
                 break;

@@ -29,6 +29,7 @@ jobs:
           PasswordAuthentication no
           AllowTcpForwarding yes
           SSHEOF
+          sudo mkdir -p /run/sshd
           sudo /usr/sbin/sshd -f /etc/ssh/sshd_test_config
 
           # Start TCP echo server

@@ -59,10 +59,7 @@ fn free_port() -> u16 {
 }
 
 /// Spawn an SSH tunnel and return the child process + ephemeral port
-async fn spawn_ssh_tunnel(
-    config: &TestTunnelConfig,
-    ephemeral_port: u16,
-) -> tokio::process::Child {
+async fn spawn_ssh_tunnel(config: &TestTunnelConfig, ephemeral_port: u16) -> tokio::process::Child {
     tokio::process::Command::new("ssh")
         .args([
             "-N",
@@ -127,10 +124,9 @@ async fn basic_tunnel_lifecycle() {
 
     // Start proxy
     let stats = std::sync::Arc::new(bad_adit::stats::TunnelStats::new());
-    let proxy =
-        bad_adit::proxy::ProxyListener::start(local_port, ephemeral_port, stats.clone())
-            .await
-            .expect("Failed to start proxy");
+    let proxy = bad_adit::proxy::ProxyListener::start(local_port, ephemeral_port, stats.clone())
+        .await
+        .expect("Failed to start proxy");
 
     // Connect and send data
     let mut client = TcpStream::connect(format!("127.0.0.1:{}", local_port))
@@ -179,10 +175,9 @@ async fn multiple_concurrent_connections() {
     assert!(wait_for_port(ephemeral_port, 5000).await);
 
     let stats = std::sync::Arc::new(bad_adit::stats::TunnelStats::new());
-    let proxy =
-        bad_adit::proxy::ProxyListener::start(local_port, ephemeral_port, stats.clone())
-            .await
-            .unwrap();
+    let proxy = bad_adit::proxy::ProxyListener::start(local_port, ephemeral_port, stats.clone())
+        .await
+        .unwrap();
 
     // Open 5 connections
     let mut clients = Vec::new();
@@ -232,10 +227,9 @@ async fn stats_accuracy() {
     assert!(wait_for_port(ephemeral_port, 5000).await);
 
     let stats = std::sync::Arc::new(bad_adit::stats::TunnelStats::new());
-    let proxy =
-        bad_adit::proxy::ProxyListener::start(local_port, ephemeral_port, stats.clone())
-            .await
-            .unwrap();
+    let proxy = bad_adit::proxy::ProxyListener::start(local_port, ephemeral_port, stats.clone())
+        .await
+        .unwrap();
 
     // Send a known 4096-byte payload
     let payload = vec![0xABu8; 4096];

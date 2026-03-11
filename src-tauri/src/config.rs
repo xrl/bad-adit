@@ -60,10 +60,7 @@ impl ConfigStore {
     }
 }
 
-pub fn validate_config(
-    config: &TunnelConfig,
-    all_configs: &[TunnelConfig],
-) -> Result<(), String> {
+pub fn validate_config(config: &TunnelConfig, all_configs: &[TunnelConfig]) -> Result<(), String> {
     if config.name.trim().is_empty() {
         return Err("Tunnel name cannot be empty".to_string());
     }
@@ -98,10 +95,7 @@ pub fn validate_config(
     if !config.ssh_key_path.is_empty() {
         let key_path = PathBuf::from(&config.ssh_key_path);
         if !key_path.exists() {
-            log::warn!(
-                "SSH key path does not exist: {}",
-                config.ssh_key_path
-            );
+            log::warn!("SSH key path does not exist: {}", config.ssh_key_path);
         }
     }
 
