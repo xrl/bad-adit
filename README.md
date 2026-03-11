@@ -45,7 +45,7 @@ The root forwarder includes a **parent-PID watchdog** that polls every 2 seconds
 ## Install
 
 ```sh
-brew install xrl/bad-adit/bad-adit
+brew install xrl/tap/bad-adit
 ```
 
 This taps the repo and installs the latest release. To update later:
