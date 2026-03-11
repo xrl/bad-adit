@@ -24,14 +24,14 @@ jobs:
           chmod 600 ~/.ssh/authorized_keys
 
           # Configure system sshd to also listen on port 2222
+          sudo mkdir -p /run/sshd
           echo "Port 2222" | sudo tee -a /etc/ssh/sshd_config
           echo "AllowTcpForwarding yes" | sudo tee -a /etc/ssh/sshd_config
           echo "PubkeyAuthentication yes" | sudo tee -a /etc/ssh/sshd_config
-          sudo sshd -t || { echo "sshd config test failed"; sudo cat /etc/ssh/sshd_config; exit 1; }
-          sudo systemctl restart ssh || sudo systemctl restart sshd || { echo "Failed to restart sshd"; sudo journalctl -u ssh -u sshd --no-pager -n 20; exit 1; }
+          sudo sshd -t
+          sudo systemctl restart ssh || sudo systemctl restart sshd
           sleep 1
-          sudo ss -tlnp
-          sudo ss -tlnp | grep 2222 || { echo "sshd not listening on 2222"; exit 1; }
+          sudo ss -tlnp | grep 2222
 
           # Start TCP echo server
           socat TCP-LISTEN:9999,fork,reuseaddr EXEC:cat &
